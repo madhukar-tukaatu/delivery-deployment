@@ -7,14 +7,20 @@ BASE_DIR="/var/www/delivery"
 echo "Moving to base directory..."
 cd "$BASE_DIR"
 
-echo "Pulling backend..."
-git -C delivery-backend pull origin main
+echo "Syncing backend with GitHub..."
+git -C delivery-backend fetch origin main
+git -C delivery-backend reset --hard origin/main
+git -C delivery-backend clean -fd
 
-echo "Pulling frontend..."
-git -C delivery-frontend pull origin main
+echo "Syncing frontend with GitHub..."
+git -C delivery-frontend fetch origin main
+git -C delivery-frontend reset --hard origin/main
+git -C delivery-frontend clean -fd
 
-echo "Pulling deployment repo..."
-git -C delivery-deployment pull origin main
+echo "Syncing deployment repo with GitHub..."
+git -C delivery-deployment fetch origin main
+git -C delivery-deployment reset --hard origin/main
+git -C delivery-deployment clean -fd -e .env.production
 
 echo "Moving to deployment repo..."
 cd "$BASE_DIR/delivery-deployment"
