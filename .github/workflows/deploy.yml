@@ -11,12 +11,12 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Deploy through SSH action
+      - name: Deploy through SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
-          host: ${{ secrets.VPS_HOST }}
-          port: ${{ secrets.VPS_PORT }}
-          username: ${{ secrets.VPS_USERNAME }}
+          host: 164.68.109.98
+          port: 22
+          username: deploy
           password: ${{ secrets.VPS_PASSWORD }}
           script: |
             cd /var/www/delivery/delivery-deployment
