@@ -2,41 +2,42 @@
 
 set -e
 
-BASE_DIR="${BASE_DIR:-/var/www/delivery}"
+BASE_DIR="/var/www/delivery"
 
-echo "Going to project directory..."
+echo "Moving to base directory..."
 cd "$BASE_DIR"
 
-echo "Pulling latest backend..."
+echo "Pulling backend..."
 git -C delivery-backend pull origin main
 
-echo "Pulling latest frontend..."
+echo "Pulling frontend..."
 git -C delivery-frontend pull origin main
 
-echo "Pulling latest deployment repo..."
+echo "Pulling deployment repo..."
 git -C delivery-deployment pull origin main
 
-cd delivery-deployment
+echo "Moving to deployment repo..."
+cd "$BASE_DIR/delivery-deployment"
 
-echo "Building and starting containers..."
+echo "Building and starting Docker containers..."
 docker compose --env-file .env.production up -d --build --remove-orphans
 
 echo "Running Laravel migrations..."
 docker compose --env-file .env.production exec -T backend-app php artisan migrate --force
 
-echo "Linking storage..."
+echo "Creating storage link..."
 docker compose --env-file .env.production exec -T backend-app php artisan storage:link || true
 
-echo "Optimizing Laravel..."
+echo "Clearing and caching Laravel..."
 docker compose --env-file .env.production exec -T backend-app php artisan optimize:clear
 docker compose --env-file .env.production exec -T backend-app php artisan config:cache
 docker compose --env-file .env.production exec -T backend-app php artisan route:cache
 docker compose --env-file .env.production exec -T backend-app php artisan view:cache
 
-echo "Restarting queue and scheduler..."
+echo "Restarting workers..."
 docker compose --env-file .env.production restart backend-queue backend-scheduler backend-reverb
 
-echo "Cleaning old Docker images..."
+echo "Cleaning unused Docker images..."
 docker image prune -f
 
-echo "Deployment completed."
+echo "Deployment completed successfully."
