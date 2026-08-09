@@ -1,0 +1,387 @@
+name: delivery-local
+
+services:
+
+  # ==========================================================
+  # MYSQL
+  # ==========================================================
+
+  mysql:
+    image: mysql:8.0
+    container_name: delivery-local-mysql
+    restart: unless-stopped
+
+    environment:
+      MYSQL_DATABASE: delivery_dms
+      MYSQL_USER: delivery_user
+      MYSQL_PASSWORD: delivery_password
+      MYSQL_ROOT_PASSWORD: root_password
+
+    ports:
+      - "3307:3306"
+
+    volumes:
+      - mysql_local_data:/var/lib/mysql
+
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "mysqladmin ping -h 127.0.0.1 -u root -proot_password --silent"
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
+    networks:
+      - delivery-local
+
+
+  # ==========================================================
+  # PHPMYADMIN
+  # ==========================================================
+
+  phpmyadmin:
+    image: phpmyadmin:latest
+    container_name: delivery-local-phpmyadmin
+    restart: unless-stopped
+
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+    environment:
+      PMA_HOST: mysql
+      PMA_PORT: 3306
+      PMA_ARBITRARY: "0"
+      UPLOAD_LIMIT: 256M
+
+    ports:
+      - "8085:80"
+
+    networks:
+      - delivery-local
+
+
+  # ==========================================================
+  # REDIS
+  # ==========================================================
+
+  redis:
+    image: redis:7-alpine
+    container_name: delivery-local-redis
+    restart: unless-stopped
+
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+
+    ports:
+      - "6380:6379"
+
+    volumes:
+      - redis_local_data:/data
+
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "redis-cli",
+          "ping"
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+
+    networks:
+      - delivery-local
+
+
+  # ==========================================================
+  # MAILPIT
+  # ==========================================================
+
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: delivery-local-mailpit
+    restart: unless-stopped
+
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+
+    networks:
+      - delivery-local
+
+
+  # ==========================================================
+  # LARAVEL BACKEND
+  # ==========================================================
+
+  backend-app:
+    build:
+      context: ../delivery-backend
+      dockerfile: Dockerfile.local
+
+    container_name: delivery-local-backend-app
+    restart: unless-stopped
+
+    working_dir: /var/www/html
+
+    env_file:
+      - ../delivery-backend/.env
+
+    volumes:
+      - ../delivery-backend:/var/www/html
+      - backend_vendor:/var/www/html/vendor
+
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+      redis:
+        condition: service_healthy
+
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "php artisan about >/dev/null 2>&1"
+        ]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+
+    networks:
+      - delivery-local
+
+
+  # ==========================================================
+  # BACKEND NGINX
+  # ==========================================================
+
+  backend-nginx:
+    image: nginx:alpine
+    container_name: delivery-local-backend-nginx
+    restart: unless-stopped
+
+    ports:
+      - "8081:80"
+
+    volumes:
+      - ../delivery-backend:/var/www/html:ro
+      - backend_vendor:/var/www/html/vendor:ro
+      - ./nginx/backend.local.conf:/etc/nginx/conf.d/default.conf:ro
+
+    depends_on:
+      backend-app:
+        condition: service_healthy
+
+    networks:
+      - delivery-local
+
+
+  # ==========================================================
+  # LARAVEL QUEUE
+  # ==========================================================
+
+  backend-queue:
+    build:
+      context: ../delivery-backend
+      dockerfile: Dockerfile.local
+
+    container_name: delivery-local-backend-queue
+    restart: unless-stopped
+
+    working_dir: /var/www/html
+
+    env_file:
+      - ../delivery-backend/.env
+
+    volumes:
+      - ../delivery-backend:/var/www/html
+      - backend_vendor:/var/www/html/vendor
+
+    command:
+      - php
+      - artisan
+      - queue:work
+      - redis
+      - --queue=emails,broadcasts,notifications,webhooks,settlements,reports,default
+      - --sleep=1
+      - --tries=3
+      - --timeout=120
+
+    depends_on:
+      backend-app:
+        condition: service_healthy
+
+      mysql:
+        condition: service_healthy
+
+      redis:
+        condition: service_healthy
+
+    networks:
+      - delivery-local
+
+
+  # ==========================================================
+  # LARAVEL SCHEDULER
+  # ==========================================================
+
+  backend-scheduler:
+    build:
+      context: ../delivery-backend
+      dockerfile: Dockerfile.local
+
+    container_name: delivery-local-backend-scheduler
+    restart: unless-stopped
+
+    working_dir: /var/www/html
+
+    env_file:
+      - ../delivery-backend/.env
+
+    volumes:
+      - ../delivery-backend:/var/www/html
+      - backend_vendor:/var/www/html/vendor
+
+    command:
+      - php
+      - artisan
+      - schedule:work
+
+    depends_on:
+      backend-app:
+        condition: service_healthy
+
+      mysql:
+        condition: service_healthy
+
+      redis:
+        condition: service_healthy
+
+    networks:
+      - delivery-local
+
+
+  # ==========================================================
+  # LARAVEL REVERB
+  # ==========================================================
+
+  backend-reverb:
+    build:
+      context: ../delivery-backend
+      dockerfile: Dockerfile.local
+
+    container_name: delivery-local-backend-reverb
+    restart: unless-stopped
+
+    working_dir: /var/www/html
+
+    env_file:
+      - ../delivery-backend/.env
+
+    volumes:
+      - ../delivery-backend:/var/www/html
+      - backend_vendor:/var/www/html/vendor
+
+    command:
+      - php
+      - artisan
+      - reverb:start
+      - --host=0.0.0.0
+      - --port=8080
+
+    ports:
+      - "8080:8080"
+
+    depends_on:
+      backend-app:
+        condition: service_healthy
+
+      redis:
+        condition: service_healthy
+
+    networks:
+      - delivery-local
+
+
+  # ==========================================================
+  # NEXT.JS FRONTEND
+  # ==========================================================
+
+  frontend:
+    build:
+      context: ../delivery-frontend
+      dockerfile: Dockerfile.local
+
+    container_name: delivery-local-frontend
+    restart: unless-stopped
+
+    working_dir: /app
+
+    environment:
+      NODE_ENV: development
+      NEXT_TELEMETRY_DISABLED: "1"
+
+      NEXT_PUBLIC_API_BASE_URL: http://localhost:8081/api/v1
+      NEXT_PUBLIC_API_URL: http://localhost:8081/api/v1
+      NEXT_PUBLIC_API_ORIGIN: http://localhost:8081
+
+      NEXT_PUBLIC_REVERB_APP_KEY: delivery-key
+      NEXT_PUBLIC_REVERB_HOST: localhost
+      NEXT_PUBLIC_REVERB_PORT: "8080"
+      NEXT_PUBLIC_REVERB_SCHEME: http
+
+    volumes:
+      - ../delivery-frontend:/app
+      - frontend_node_modules:/app/node_modules
+      - frontend_next:/app/.next
+
+    command:
+      - sh
+      - -c
+      - |
+        if [ ! -x node_modules/.bin/next ]; then
+          echo "Installing frontend dependencies..."
+          pnpm install --frozen-lockfile
+        fi
+
+        exec pnpm dev --hostname 0.0.0.0
+
+    ports:
+      - "3000:3000"
+
+    depends_on:
+      backend-nginx:
+        condition: service_started
+
+    networks:
+      - delivery-local
+
+
+# ============================================================
+# NETWORK
+# ============================================================
+
+networks:
+  delivery-local:
+    driver: bridge
+
+
+# ============================================================
+# VOLUMES
+# ============================================================
+
+volumes:
+  mysql_local_data:
+  redis_local_data:
+  backend_vendor:
+  frontend_node_modules:
+  frontend_next:

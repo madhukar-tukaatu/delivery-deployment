@@ -1,0 +1,94 @@
+FROM php:8.4-fpm
+
+WORKDIR /var/www/html
+
+ENV COMPOSER_ALLOW_SUPERUSER=1
+
+# ============================================================
+# SYSTEM DEPENDENCIES
+# ============================================================
+
+RUN apt-get update && apt-get install -y \
+    git \
+    curl \
+    unzip \
+    zip \
+    libzip-dev \
+    libpng-dev \
+    libjpeg62-turbo-dev \
+    libfreetype6-dev \
+    libicu-dev \
+    libonig-dev \
+    libxml2-dev \
+    default-mysql-client \
+    && docker-php-ext-configure gd \
+        --with-freetype \
+        --with-jpeg \
+    && docker-php-ext-install -j"$(nproc)" \
+        pdo_mysql \
+        zip \
+        intl \
+        bcmath \
+        exif \
+        pcntl \
+        sockets \
+        gd \
+    && pecl install redis \
+    && docker-php-ext-enable redis \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# ============================================================
+# COMPOSER
+# ============================================================
+
+COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
+
+# ============================================================
+# COPY APPLICATION
+# ============================================================
+
+COPY . /var/www/html
+
+# ============================================================
+# LARAVEL DIRECTORIES
+# ============================================================
+
+RUN mkdir -p \
+    /var/www/html/storage/app \
+    /var/www/html/storage/app/public \
+    /var/www/html/storage/framework \
+    /var/www/html/storage/framework/cache \
+    /var/www/html/storage/framework/cache/data \
+    /var/www/html/storage/framework/sessions \
+    /var/www/html/storage/framework/views \
+    /var/www/html/storage/framework/testing \
+    /var/www/html/storage/logs \
+    /var/www/html/bootstrap/cache
+
+# ============================================================
+# PERMISSIONS
+# ============================================================
+
+RUN chown -R www-data:www-data \
+    /var/www/html/storage \
+    /var/www/html/bootstrap/cache \
+    && chmod -R 775 \
+    /var/www/html/storage \
+    /var/www/html/bootstrap/cache
+
+RUN git config --global --add safe.directory /var/www/html
+
+# ============================================================
+# LOCAL START SCRIPT
+# ============================================================
+
+COPY docker/start.local.sh /usr/local/bin/start.local.sh
+
+RUN chmod +x /usr/local/bin/start.local.sh
+
+EXPOSE 9000
+
+ENTRYPOINT ["start.local.sh"]
+
+CMD ["php-fpm", "-F"]

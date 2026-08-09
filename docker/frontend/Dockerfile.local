@@ -1,0 +1,39 @@
+FROM node:24-alpine
+
+WORKDIR /app
+
+ENV NEXT_TELEMETRY_DISABLED=1
+
+# ============================================================
+# PNPM
+# ============================================================
+
+RUN corepack enable \
+    && corepack prepare pnpm@10.15.0 --activate
+
+# ============================================================
+# PACKAGE FILES
+# ============================================================
+
+COPY package.json ./
+
+COPY pnpm-lock.yaml* ./
+
+COPY pnpm-workspace.yaml* ./
+
+# ============================================================
+# INSTALL
+# ============================================================
+
+RUN if [ -f pnpm-lock.yaml ]; then \
+        pnpm install --frozen-lockfile; \
+    else \
+        pnpm install; \
+    fi
+
+EXPOSE 3000
+
+ENV PORT=3000
+ENV HOSTNAME=0.0.0.0
+
+CMD ["pnpm", "dev", "--hostname", "0.0.0.0"]
