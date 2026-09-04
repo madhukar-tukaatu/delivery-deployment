@@ -54,8 +54,15 @@ services:
     environment:
       PMA_HOST: mysql
       PMA_PORT: 3306
-      PMA_ARBITRARY: "0"
-      UPLOAD_LIMIT: 256M
+      PMA_ARBITRARY: "1"
+      PMA_USER: root
+      PMA_PASSWORD: root_password
+      UPLOAD_LIMIT: 2048M
+      MAX_EXECUTION_TIME: 3600
+      MEMORY_LIMIT: 2048M
+
+    volumes:
+      - ./phpmyadmin/php-upload.ini:/usr/local/etc/php/conf.d/uploads.ini:ro
 
     ports:
       - "8085:80"

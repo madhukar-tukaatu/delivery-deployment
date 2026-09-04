@@ -55,7 +55,8 @@ services:
       - backend_storage:/var/www/html/storage
     networks:
       - delivery
-    command: php artisan queue:work redis --queue=high,broadcasts,notifications,webhooks,settlements,reports,default --tries=3 --timeout=120
+    command: php artisan queue:work redis --queue=high,emails,broadcasts,notifications,webhooks,settlements,reports,default --tries=3 --timeout=120
+    
 
   backend-scheduler:
     build:
