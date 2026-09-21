@@ -14,9 +14,9 @@ jobs:
       - name: Deploy through SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
-          host: 164.68.109.98
-          port: 22
-          username: deploy
+          host: ${{ secrets.VPS_HOST }}
+          port: ${{ secrets.VPS_PORT }}
+          username: ${{ secrets.VPS_USER }}
           password: ${{ secrets.VPS_PASSWORD }}
           script: |
             cd /var/www/delivery/delivery-deployment
