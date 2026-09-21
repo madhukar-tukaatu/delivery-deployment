@@ -1,0 +1,104 @@
+name: delivery-monitoring
+
+# Optional overlay for VPS. Does NOT modify docker-compose.yml or app containers.
+# Usage:
+#   cp .env.monitoring.example .env.monitoring   # edit secrets
+#   docker network ls | grep delivery            # confirm DELIVERY_NETWORK
+#   docker compose --env-file .env.monitoring -f docker-compose.monitoring.prod.yml up -d
+
+services:
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    container_name: delivery-prometheus
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=15d
+      - --web.enable-lifecycle
+    ports:
+      - "127.0.0.1:9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    mem_limit: 512m
+    cpus: 0.50
+    networks:
+      - monitoring
+      - delivery
+
+  grafana:
+    image: grafana/grafana:11.3.1
+    container_name: delivery-grafana
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?Set GRAFANA_ADMIN_PASSWORD in .env.monitoring}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_SERVER_ROOT_URL: ${GRAFANA_ROOT_URL:-http://127.0.0.1:3001}
+    ports:
+      - "127.0.0.1:3001:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      - prometheus
+    mem_limit: 256m
+    cpus: 0.30
+    networks:
+      - monitoring
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    container_name: delivery-cadvisor
+    restart: unless-stopped
+    privileged: true
+    ports:
+      - "127.0.0.1:8086:8080"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+    mem_limit: 256m
+    cpus: 0.30
+    networks:
+      - monitoring
+
+  mysql-exporter:
+    image: prom/mysqld-exporter:v0.15.1
+    container_name: delivery-mysql-exporter
+    restart: unless-stopped
+    command:
+      - --config.my-cnf=/etc/mysql/my.cnf
+    volumes:
+      - ./prometheus/my.cnf.prod:/etc/mysql/my.cnf:ro
+    mem_limit: 128m
+    cpus: 0.20
+    networks:
+      - monitoring
+      - delivery
+
+  redis-exporter:
+    image: oliver006/redis_exporter:v1.66.0
+    container_name: delivery-redis-exporter
+    restart: unless-stopped
+    environment:
+      REDIS_ADDR: "redis://${REDIS_HOST:-delivery-redis}:6379"
+    mem_limit: 64m
+    cpus: 0.10
+    networks:
+      - monitoring
+      - delivery
+
+networks:
+  monitoring:
+    driver: bridge
+  delivery:
+    external: true
+    name: ${DELIVERY_NETWORK:-delivery-deployment_delivery}
+
+volumes:
+  prometheus_data:
+  grafana_data:

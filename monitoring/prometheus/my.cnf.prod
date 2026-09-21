@@ -1,0 +1,5 @@
+[client]
+user=root
+password=CHANGE_ME_MYSQL_ROOT_PASSWORD
+host=delivery-mysql
+port=3306

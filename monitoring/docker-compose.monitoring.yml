@@ -1,0 +1,102 @@
+name: delivery-monitoring
+
+services:
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    container_name: delivery-local-prometheus
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=15d
+      - --web.enable-lifecycle
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    networks:
+      - monitoring
+      - delivery-local
+
+  grafana:
+    image: grafana/grafana:11.3.1
+    container_name: delivery-local-grafana
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_SERVER_ROOT_URL: http://localhost:3001
+    ports:
+      - "3001:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      - prometheus
+    networks:
+      - monitoring
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    container_name: delivery-local-cadvisor
+    restart: unless-stopped
+    privileged: true
+    ports:
+      - "8086:8080"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+    networks:
+      - monitoring
+
+  mysql-exporter:
+    image: prom/mysqld-exporter:v0.15.1
+    container_name: delivery-local-mysql-exporter
+    restart: unless-stopped
+    command:
+      - --config.my-cnf=/etc/mysql/my.cnf
+    volumes:
+      - ./prometheus/my.cnf:/etc/mysql/my.cnf:ro
+    networks:
+      - monitoring
+      - delivery-local
+
+  redis-exporter:
+    image: oliver006/redis_exporter:v1.66.0
+    container_name: delivery-local-redis-exporter
+    restart: unless-stopped
+    environment:
+      REDIS_ADDR: "redis://delivery-local-redis:6379"
+    networks:
+      - monitoring
+      - delivery-local
+
+  k6:
+    image: grafana/k6:0.54.0
+    container_name: delivery-local-k6
+    profiles: ["loadtest"]
+    volumes:
+      - ./k6/scripts:/scripts:ro
+    environment:
+      BASE_URL: http://delivery-local-backend-nginx
+      FRONTEND_URL: http://delivery-local-frontend:3000
+    networks:
+      - delivery-local
+    # Example:
+    # docker compose -f docker-compose.monitoring.yml --profile loadtest run --rm k6 run /scripts/smoke.js
+
+networks:
+  monitoring:
+    driver: bridge
+  delivery-local:
+    external: true
+    name: delivery-local_delivery-local
+
+volumes:
+  prometheus_data:
+  grafana_data:
