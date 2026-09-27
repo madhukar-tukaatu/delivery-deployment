@@ -39,7 +39,12 @@ services:
     networks:
       - delivery
     command: php-fpm
-
+    healthcheck:
+      test: ["CMD", "php", "-r", "exit(@fsockopen('127.0.0.1', 9000) ? 0 : 1);"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
   backend-queue:
     build:
       context: ../delivery-backend
