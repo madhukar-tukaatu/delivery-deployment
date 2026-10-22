@@ -102,7 +102,8 @@ log "Moving to deployment repo..."
 cd "$BASE_DIR/delivery-deployment"
 
 log "Building and starting Docker containers..."
-docker compose --env-file "$COMPOSE_ENV" up -d --build --remove-orphans
+docker compose --env-file "$COMPOSE_ENV" build --pull
+docker compose --env-file "$COMPOSE_ENV" up -d --remove-orphans
 
 # Always recreate nginx after backend rebuild so it never keeps a dead upstream IP
 log "Recreating backend-nginx against current backend-app..."

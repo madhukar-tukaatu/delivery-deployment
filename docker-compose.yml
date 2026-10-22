@@ -28,6 +28,7 @@ services:
     build:
       context: ../delivery-backend
     container_name: delivery-backend-app
+    mem_limit: 2g
     restart: unless-stopped
     env_file:
       - .env.production
