@@ -5,6 +5,7 @@ set -euo pipefail
 BASE_DIR="/var/www/delivery"
 COMPOSE_ENV=".env.production"
 MAX_WAIT_SECONDS=120
+TARGET_BRANCH="${1:-main}"
 
 log() {
   echo "[deploy $(date '+%Y-%m-%d %H:%M:%S')] $*"
@@ -84,18 +85,18 @@ log "Moving to base directory..."
 cd "$BASE_DIR"
 
 log "Syncing backend with GitHub..."
-git -C delivery-backend fetch origin main
-git -C delivery-backend reset --hard origin/main
+git -C delivery-backend fetch origin "$TARGET_BRANCH"
+git -C delivery-backend reset --hard "origin/$TARGET_BRANCH"
 git -C delivery-backend clean -fd
 
 log "Syncing frontend with GitHub..."
-git -C delivery-frontend fetch origin main
-git -C delivery-frontend reset --hard origin/main
+git -C delivery-frontend fetch origin "$TARGET_BRANCH"
+git -C delivery-frontend reset --hard "origin/$TARGET_BRANCH"
 git -C delivery-frontend clean -fd
 
 log "Syncing deployment repo with GitHub..."
-git -C delivery-deployment fetch origin main
-git -C delivery-deployment reset --hard origin/main
+git -C delivery-deployment fetch origin "$TARGET_BRANCH"
+git -C delivery-deployment reset --hard "origin/$TARGET_BRANCH"
 git -C delivery-deployment clean -fd -e .env.production
 
 log "Moving to deployment repo..."
