@@ -46,6 +46,7 @@ ufw allow 22/tcp
 ufw allow 80/tcp
 ufw allow 443/tcp
 ufw allow 3000/tcp  # Direct frontend demo port if needed
+ufw allow 3001/tcp  # Direct Grafana monitoring UI
 ufw allow 8081/tcp  # Direct backend demo port if needed
 ufw allow 8080/tcp  # WebSockets reverb demo port if needed
 ufw --force enable
