@@ -1,6 +1,6 @@
 name: delivery-monitoring
 
-# Optional overlay for VPS. Does NOT modify docker-compose.yml or app containers.
+# Production overlay for VPS. Safe and isolated: does NOT modify docker-compose.yml or app containers.
 # Usage:
 #   cp .env.monitoring.example .env.monitoring   # edit secrets
 #   docker network ls | grep delivery            # confirm DELIVERY_NETWORK
@@ -21,8 +21,8 @@ services:
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus_data:/prometheus
-    mem_limit: 512m
-    cpus: 0.50
+    mem_limit: 384m
+    cpus: 0.35
     networks:
       - monitoring
       - delivery
@@ -44,8 +44,42 @@ services:
       - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
     depends_on:
       - prometheus
+      - loki
     mem_limit: 256m
-    cpus: 0.30
+    cpus: 0.25
+    networks:
+      - monitoring
+
+  loki:
+    image: grafana/loki:3.2.0
+    container_name: delivery-loki
+    restart: unless-stopped
+    command:
+      - -config.file=/etc/loki/local-config.yaml
+    ports:
+      - "127.0.0.1:3100:3100"
+    volumes:
+      - ./loki/loki-config.yml:/etc/loki/local-config.yaml:ro
+      - loki_data:/loki
+    mem_limit: 256m
+    cpus: 0.25
+    networks:
+      - monitoring
+
+  promtail:
+    image: grafana/promtail:3.2.0
+    container_name: delivery-promtail
+    restart: unless-stopped
+    command:
+      - -config.file=/etc/promtail/config.yml
+    volumes:
+      - ./promtail/promtail-config.yml:/etc/promtail/config.yml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+    depends_on:
+      - loki
+    mem_limit: 128m
+    cpus: 0.15
     networks:
       - monitoring
 
@@ -61,8 +95,8 @@ services:
       - /var/run:/var/run:ro
       - /sys:/sys:ro
       - /var/lib/docker/:/var/lib/docker:ro
-    mem_limit: 256m
-    cpus: 0.30
+    mem_limit: 192m
+    cpus: 0.20
     networks:
       - monitoring
 
@@ -74,8 +108,8 @@ services:
       - --config.my-cnf=/etc/mysql/my.cnf
     volumes:
       - ./prometheus/my.cnf.prod:/etc/mysql/my.cnf:ro
-    mem_limit: 128m
-    cpus: 0.20
+    mem_limit: 96m
+    cpus: 0.10
     networks:
       - monitoring
       - delivery
@@ -92,6 +126,35 @@ services:
       - monitoring
       - delivery
 
+  nginx-exporter:
+    image: nginx/nginx-prometheus-exporter:1.3.0
+    container_name: delivery-nginx-exporter
+    restart: unless-stopped
+    command:
+      - -nginx.scrape-uri=http://${NGINX_HOST:-delivery-backend-nginx}:80/stub_status
+    mem_limit: 48m
+    cpus: 0.10
+    networks:
+      - monitoring
+      - delivery
+
+  node-exporter:
+    image: prom/node-exporter:v1.8.2
+    container_name: delivery-node-exporter
+    restart: unless-stopped
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - --path.procfs=/host/proc
+      - --path.sysfs=/host/sys
+      - --path.rootfs=/rootfs
+    mem_limit: 48m
+    cpus: 0.10
+    networks:
+      - monitoring
+
 networks:
   monitoring:
     driver: bridge
@@ -102,3 +165,4 @@ networks:
 volumes:
   prometheus_data:
   grafana_data:
+  loki_data:
