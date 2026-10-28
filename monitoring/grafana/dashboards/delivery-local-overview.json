@@ -191,7 +191,7 @@
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
-          "expr": "sum(rate(container_cpu_usage_seconds_total{name=~\"delivery.*\"}[1m])) by (name) * 100",
+          "expr": "sum(rate(container_cpu_usage_seconds_total{name=~\"(/delivery.*|delivery.*)\"}[1m])) by (name) * 100",
           "legendFormat": "{{name}}",
           "refId": "A"
         }
@@ -212,7 +212,7 @@
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
-          "expr": "container_memory_working_set_bytes{name=~\"delivery.*\"}",
+          "expr": "container_memory_working_set_bytes{name=~\"(/delivery.*|delivery.*)\"}",
           "legendFormat": "{{name}}",
           "refId": "A"
         }
@@ -300,7 +300,7 @@
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
-          "expr": "(1 - (node_filesystem_avail_bytes{mountpoint=\"/\"} / node_filesystem_size_bytes{mountpoint=\"/\"})) * 100",
+          "expr": "(1 - (node_filesystem_avail_bytes{mountpoint=~\"/|/rootfs\"} / node_filesystem_size_bytes{mountpoint=~\"/|/rootfs\"})) * 100",
           "legendFormat": "Disk /",
           "refId": "A"
         }
