@@ -159,7 +159,7 @@ networks:
   monitoring:
     driver: bridge
   delivery:
-    external: true
+    driver: bridge
     name: ${DELIVERY_NETWORK:-delivery-deployment_delivery}
 
 volumes:
