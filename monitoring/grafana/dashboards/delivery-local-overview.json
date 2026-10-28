@@ -28,6 +28,7 @@
       "fieldConfig": {
         "defaults": {
           "unit": "reqps",
+          "noValue": "0",
           "color": { "mode": "palette-classic" },
           "thresholds": {
             "mode": "absolute",
@@ -57,6 +58,7 @@
       "fieldConfig": {
         "defaults": {
           "unit": "short",
+          "noValue": "0",
           "color": { "mode": "palette-classic" },
           "thresholds": {
             "mode": "absolute",
@@ -135,6 +137,7 @@
       "fieldConfig": {
         "defaults": {
           "unit": "reqps",
+          "noValue": "0",
           "custom": { "fillOpacity": 15, "lineWidth": 2 }
         },
         "overrides": []
@@ -171,6 +174,7 @@
       "fieldConfig": {
         "defaults": {
           "unit": "short",
+          "noValue": "0",
           "custom": { "fillOpacity": 10, "lineWidth": 2 }
         },
         "overrides": []
@@ -392,7 +396,7 @@
   "tags": ["delivery", "express", "traffic", "infrastructure"],
   "templating": { "list": [] },
   "time": { "from": "now-15m", "to": "now" },
-  "timezone": "browser",
+  "timezone": "Asia/Kathmandu",
   "title": "Tukaatu Express - Full Site & Infrastructure Overview",
   "uid": "delivery-overview",
   "version": 2

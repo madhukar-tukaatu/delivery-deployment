@@ -11,6 +11,8 @@ services:
     image: prom/prometheus:v2.55.1
     container_name: delivery-prometheus
     restart: unless-stopped
+    environment:
+      TZ: ${TZ:-Asia/Kathmandu}
     command:
       - --config.file=/etc/prometheus/prometheus.yml
       - --storage.tsdb.path=/prometheus
@@ -36,6 +38,8 @@ services:
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
       GF_USERS_ALLOW_SIGN_UP: "false"
       GF_SERVER_ROOT_URL: ${GRAFANA_ROOT_URL:-http://103.160.22.123:3001}
+      TZ: ${TZ:-Asia/Kathmandu}
+      GF_DATE_FORMATS_DEFAULT_TIMEZONE: ${TZ:-Asia/Kathmandu}
     ports:
       - "3001:3000"
     volumes:
@@ -54,6 +58,8 @@ services:
     image: grafana/loki:3.2.0
     container_name: delivery-loki
     restart: unless-stopped
+    environment:
+      TZ: ${TZ:-Asia/Kathmandu}
     command:
       - -config.file=/etc/loki/local-config.yaml
     ports:
@@ -70,6 +76,8 @@ services:
     image: grafana/promtail:3.2.0
     container_name: delivery-promtail
     restart: unless-stopped
+    environment:
+      TZ: ${TZ:-Asia/Kathmandu}
     command:
       - -config.file=/etc/promtail/config.yml
     volumes:
