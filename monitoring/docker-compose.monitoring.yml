@@ -36,6 +36,36 @@ services:
       - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
     depends_on:
       - prometheus
+      - loki
+    networks:
+      - monitoring
+
+  loki:
+    image: grafana/loki:3.2.0
+    container_name: delivery-local-loki
+    restart: unless-stopped
+    command:
+      - -config.file=/etc/loki/local-config.yaml
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./loki/loki-config.yml:/etc/loki/local-config.yaml:ro
+      - loki_data:/loki
+    networks:
+      - monitoring
+
+  promtail:
+    image: grafana/promtail:3.2.0
+    container_name: delivery-local-promtail
+    restart: unless-stopped
+    command:
+      - -config.file=/etc/promtail/config.yml
+    volumes:
+      - ./promtail/promtail-config.yml:/etc/promtail/config.yml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+    depends_on:
+      - loki
     networks:
       - monitoring
 
@@ -76,6 +106,23 @@ services:
       - monitoring
       - delivery-local
 
+  nginx-exporter:
+    image: nginx/nginx-prometheus-exporter:1.3.0
+    container_name: delivery-local-nginx-exporter
+    restart: unless-stopped
+    command:
+      - -nginx.scrape-uri=http://delivery-local-backend-nginx:80/stub_status
+    networks:
+      - monitoring
+      - delivery-local
+
+  node-exporter:
+    image: prom/node-exporter:v1.8.2
+    container_name: delivery-local-node-exporter
+    restart: unless-stopped
+    networks:
+      - monitoring
+
   k6:
     image: grafana/k6:0.54.0
     container_name: delivery-local-k6
@@ -87,8 +134,6 @@ services:
       FRONTEND_URL: http://delivery-local-frontend:3000
     networks:
       - delivery-local
-    # Example:
-    # docker compose -f docker-compose.monitoring.yml --profile loadtest run --rm k6 run /scripts/smoke.js
 
 networks:
   monitoring:
@@ -100,3 +145,4 @@ networks:
 volumes:
   prometheus_data:
   grafana_data:
+  loki_data:

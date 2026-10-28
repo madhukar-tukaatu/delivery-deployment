@@ -1,0 +1,24 @@
+name: Deploy Delivery App (Development)
+
+on:
+  push:
+    branches:
+      - deploy
+
+jobs:
+  deploy:
+    name: Deploy to Dev VPS
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy through SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEV_VPS_HOST }}
+          port: ${{ secrets.DEV_VPS_PORT || 22 }}
+          username: ${{ secrets.DEV_VPS_USERNAME }}
+          password: ${{ secrets.DEV_VPS_PASSWORD }}
+          script: |
+            cd /var/www/delivery/delivery-deployment
+            bash scripts/deploy.sh deploy
+

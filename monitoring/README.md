@@ -1,59 +1,73 @@
-# Delivery local monitoring + load testing
+# Tukaatu Express Monitoring, Logs & Load Testing Stack
 
-Stack: Prometheus, Grafana, cAdvisor, MySQL exporter, Redis exporter, k6 (on demand).
+Full-site observability stack for Tukaatu Express: **Grafana, Prometheus, Loki, Promtail, Nginx Exporter, Node Exporter, cAdvisor, MySQL Exporter, Redis Exporter, and k6**.
 
-## Start monitoring (while delivery-local is already up)
+---
+
+## What It Monitors
+
+1. **Full Site Logs (Loki + Promtail)**:
+   - **Real-Time Live Logs**: Ingests logs from all containers (`backend-app`, `backend-nginx`, `backend-queue`, `backend-scheduler`, `backend-reverb`, `frontend`, `mysql`, `redis`).
+   - **Laravel Stack Traces**: Multiline grouping captures complete exception traces rather than splitting them into fragmented lines.
+   - **Nginx Inbound Traffic Logs**: Captures HTTP status codes (200, 404, 500), requested URIs, HTTP methods, client IPs.
+   - **Log Filtering**: Filter by service and search keywords directly in Grafana.
+
+2. **Traffic & Web Server Performance (Prometheus + Nginx Exporter)**:
+   - Real-time HTTP requests per second (RPS)
+   - Nginx connection pool (Active connections, Reading, Writing, Waiting/Keep-alive)
+   - Inbound / outbound network bandwidth
+
+3. **Database & Cache Health (MySQL & Redis Exporters)**:
+   - MySQL queries per second, slow queries, active thread connections
+   - Redis commands per second, memory consumption, keyspace stats
+
+4. **Host VM & Container Infrastructure (Node Exporter & cAdvisor)**:
+   - Host CPU load %, RAM availability, Root disk storage % used
+   - Per-container CPU % and working memory (RAM)
+
+---
+
+## Start Monitoring (Local Development)
+
+Ensure your local app containers (`docker-compose.local.yml`) are running, then start the monitoring stack:
 
 ```bash
 cd delivery-deployment/monitoring
 docker compose -f docker-compose.monitoring.yml up -d
 ```
 
-## URLs
+### URLs
 
-| Service     | URL                      | Notes                |
-|------------|---------------------------|----------------------|
-| Grafana    | http://localhost:3001     | admin / admin        |
-| Prometheus | http://localhost:9090     | targets status       |
-| cAdvisor   | http://localhost:8086     | container metrics    |
+| Service | Local URL | Default Credentials | Description |
+|---|---|---|---|
+| **Grafana** | `http://localhost:3001` | `admin` / `admin` | Dashboards, Log Explorer & Metrics |
+| **Prometheus** | `http://localhost:9090` | None | Scrape targets, PromQL queries |
+| **Loki** | `http://localhost:3100` | None | Log aggregation HTTP API |
+| **cAdvisor** | `http://localhost:8086` | None | Container metrics browser |
 
-Dashboard: **Delivery / Delivery local overview** (auto-provisioned).
+### Pre-Configured Grafana Dashboards
 
-## Run k6 from Docker
+Dashboards are provisioned automatically in Grafana folder **Delivery**:
+1. **Tukaatu Express - Full Site & Infrastructure Overview**:
+   - HTTP request rates, active connections, host CPU/RAM/Disk, container CPU/RAM, MySQL queries, Redis ops.
+2. **Tukaatu Express - Full Site Logs & Diagnostics**:
+   - Live streaming logs from all services, error rate histograms, Nginx HTTP access traffic logs, and backend exception trace viewer.
 
-From `monitoring/`:
+---
 
-```bash
-# smoke
-docker compose -f docker-compose.monitoring.yml run --rm -e BASE_URL=http://delivery-local-backend-nginx -e FRONTEND_URL=http://delivery-local-frontend:3000 k6 run /scripts/smoke.js
+## Production VPS Deployment
 
-# peak (~10k DAU-ish concurrent browsers)
-docker compose -f docker-compose.monitoring.yml run --rm -e BASE_URL=http://delivery-local-backend-nginx k6 run /scripts/peak-10k-dau.js
+See [DEPLOY-VPS.md](./DEPLOY-VPS.md).
 
-# login load (set a real password)
-docker compose -f docker-compose.monitoring.yml run --rm ^
-  -e BASE_URL=http://delivery-local-backend-nginx ^
-  -e LOGIN_EMAIL=admin@example.com ^
-  -e LOGIN_PASSWORD=your-password ^
-  k6 run /scripts/auth-login.js
-```
+Uses `docker-compose.monitoring.prod.yml` + `.env.monitoring`.
+All services bind strictly to `127.0.0.1` and run with strict memory/CPU limits (~800MB - 1GB footprint total) to protect app performance on a 2GB–4GB VM.
 
-Watch Grafana while k6 runs: container CPU/memory, MySQL queries, Redis commands.
+---
 
-## Stop
+## Stop Monitoring
 
 ```bash
 docker compose -f docker-compose.monitoring.yml down
 ```
 
-Data volumes (`prometheus_data`, `grafana_data`) are kept unless you add `-v`.
-
-## Notes
-
-- This monitors infrastructure. App-level Laravel metrics (request latency by route) need a later instrumentation step.
-- On Docker Desktop Windows, cAdvisor metrics for containers are the useful signal; host Node Exporter is skipped on purpose.
-- Default Grafana password is `admin` — change it before any shared/VPS use.
-
-## VPS (production) deploy
-
-See [DEPLOY-VPS.md](./DEPLOY-VPS.md). Use `docker-compose.monitoring.prod.yml` + `.env.monitoring` — separate from the app compose so server git dirty files are safe.
+Add `-v` if you also want to clear persisted metrics and log databases (`prometheus_data`, `grafana_data`, `loki_data`).
