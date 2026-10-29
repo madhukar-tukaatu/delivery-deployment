@@ -53,6 +53,7 @@ services:
     cpus: 0.25
     networks:
       - monitoring
+      - delivery
 
   loki:
     image: grafana/loki:3.2.0
