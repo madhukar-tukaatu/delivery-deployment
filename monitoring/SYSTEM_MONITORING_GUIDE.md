@@ -336,3 +336,207 @@ The script performs the following orchestrated steps automatically:
 7. Gracefully restarts queue workers and WebSockets.
 8. Reloads Nginx without dropping traffic (`nginx -s reload`).
 9. Prunes dangling Docker images.
+
+---
+
+## 5. End-to-End System Verification Checklist
+
+Run these quick diagnostic commands on the server to verify each monitoring component is healthy and reporting data:
+
+### 1. Check Container Health
+```bash
+docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+```
+All 9 monitoring containers should show `Up`:
+- `delivery-grafana`
+- `delivery-prometheus`
+- `delivery-loki`
+- `delivery-promtail`
+- `delivery-cadvisor`
+- `delivery-nginx-exporter`
+- `delivery-node-exporter`
+- `delivery-mysql-exporter`
+- `delivery-redis-exporter`
+
+### 2. Verify Prometheus Scrape Targets
+Query the Prometheus internal targets API:
+```bash
+curl -s http://127.0.0.1:9090/api/v1/targets | python3 -c "
+import sys, json
+data = json.load(sys.stdin)
+for t in data['data']['activeTargets']:
+    print(f\"{t['labels']['job']}: {t['health']} ({t['scrapeUrl']})\")
+"
+```
+**Expected Output**:
+```
+prometheus: up
+cadvisor: up
+nginx: up
+node: up
+mysql: up
+redis: up
+```
+
+### 3. Verify Loki Log Ingestion
+Check that Loki is ready to receive and serve logs:
+```bash
+# Check readiness
+curl -s http://127.0.0.1:3100/ready
+# Output should be: ready
+
+# Query latest 5 lines of logs from Loki
+curl -G -s "http://127.0.0.1:3100/loki/api/v1/query" \
+  --data-urlencode 'query={container=~"delivery.*"}' \
+  --data-urlencode 'limit=5' | python3 -m json.tool | head -n 30
+```
+
+### 4. Verify Promtail Log Tailing
+Check that Promtail is successfully discovering and streaming from Docker containers:
+```bash
+curl -s http://127.0.0.1:9080/targets | grep -E "delivery|State"
+```
+
+---
+
+## 6. Full Alerting & Reporting Setup Guide
+
+Grafana 11 includes an enterprise-grade Alerting & Reporting engine. Follow this guide to set up automated alerts and scheduled reports.
+
+---
+
+### A. Setting Up Alert Notification Channels (Contact Points)
+
+To receive real-time notifications when an incident occurs:
+
+1. Open Grafana: `http://103.160.22.123:3001`
+2. Navigate to: **Alerting** (bell icon on left menu) &rarr; **Contact points**.
+3. Click **Add contact point**.
+
+#### Option 1: Telegram Alerts (Recommended for Instant Alerts)
+- **Name**: `Telegram-Delivery-Alerts`
+- **Integration**: `Telegram`
+- **BOT API Token**: Enter your Telegram bot token from `@BotFather`.
+- **Chat ID**: Enter your Telegram Group ID or personal ID.
+- Click **Test** &rarr; **Save contact point**.
+
+#### Option 2: Discord or Slack Webhooks
+- **Name**: `Discord-DevOps-Channel`
+- **Integration**: `Discord` (or `Slack`)
+- **Webhook URL**: Paste your incoming webhook URL.
+- Click **Test** &rarr; **Save contact point**.
+
+#### Option 3: Email Alerts (SMTP)
+- Set up SMTP credentials in `monitoring/docker-compose.monitoring.prod.yml` under `grafana` environment:
+  ```yaml
+  GF_SMTP_ENABLED: "true"
+  GF_SMTP_HOST: "smtp.gmail.com:587"
+  GF_SMTP_USER: "your-email@gmail.com"
+  GF_SMTP_PASSWORD: "your-app-password"
+  GF_SMTP_FROM_ADDRESS: "alerts@tukaatu.com"
+  ```
+
+---
+
+### B. Configuring Essential Alert Rules in Grafana
+
+Navigate to: **Alerting** &rarr; **Alert rules** &rarr; **New alert rule**.
+
+#### Rule 1: HTTP 500 Error Spike (Critical)
+- **Rule Name**: `Tukaatu Express - Elevated 5xx Server Errors`
+- **Datasource**: `Loki`
+- **Query**:
+  ```logql
+  sum(rate({container=~".*nginx.*"} |~ " 50[0-9] " [2m]))
+  ```
+- **Condition**: Alert when query is `> 0.05` for 2 minutes.
+- **Summary**: `Nginx is reporting more than 5% HTTP 500 errors. Investigate backend PHP-FPM immediately.`
+
+#### Rule 2: Host Memory Saturation (> 85%)
+- **Rule Name**: `VPS - RAM Overload Warning`
+- **Datasource**: `Prometheus`
+- **Query**:
+  ```promql
+  (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100
+  ```
+- **Condition**: Alert when query is `> 85` for 5 minutes.
+- **Summary**: `VPS RAM usage has exceeded 85%. Risk of PHP-FPM out-of-memory crash.`
+
+#### Rule 3: Root Disk Storage Running Low (< 15% Free)
+- **Rule Name**: `VPS - Low Disk Space`
+- **Datasource**: `Prometheus`
+- **Query**:
+  ```promql
+  (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}) * 100
+  ```
+- **Condition**: Alert when query is `< 15` for 10 minutes.
+- **Summary**: `Less than 15% disk space remaining on root partition. Prune docker logs and old backups.`
+
+#### Rule 4: MySQL Database Offline or Stalled
+- **Rule Name**: `Database - MySQL Service Down`
+- **Datasource**: `Prometheus`
+- **Query**:
+  ```promql
+  mysql_up == 0
+  ```
+- **Condition**: Alert when query is `== 0` for 1 minute.
+- **Summary**: `delivery-mysql is unreachable. The application cannot serve traffic.`
+
+---
+
+### C. Exporting Reports & Incident Logs
+
+#### 1. Exporting a Live Dashboard Snapshot / PDF
+1. Go to **Dashboards** &rarr; Open **Tukaatu Express - Full Site & Infrastructure Overview**.
+2. Select the desired timeframe (e.g., `Last 7 days` or `Yesterday 00:00 to 23:59`).
+3. Click the **Share** icon (top right corner):
+   - **Snapshot**: Generate an interactive, shareable public link or local snapshot that can be sent to team members.
+   - **Print / PDF**: Use your browser's Print dialog (`Ctrl + P`) &rarr; Save as PDF with `Background graphics` enabled for an executive summary report.
+
+#### 2. Exporting Incident Logs as CSV
+1. Go to **Explore** (compass icon on left menu).
+2. Select datasource: **Loki**.
+3. Run your incident query, for example:
+   ```logql
+   {container=~".*backend-app.*"} |~ "(?i)exception|fatal|error"
+   ```
+4. Click **Inspect** (top right) &rarr; **Data** tab &rarr; **Download CSV**.
+5. You now have the exact timestamped logs and stack traces ready for incident reviews or developer ticketing.
+
+---
+
+### D. Standard Weekly Operations Report Template
+
+Use this markdown template to document weekly production reviews:
+
+```markdown
+# Tukaatu Express Weekly System & Traffic Report
+**Reporting Period**: [Date] to [Date]
+**Platform**: Production VPS (103.160.22.123)
+
+## 1. Traffic & SLA Overview
+- Total Handled HTTP Requests: [increase(nginx_http_requests_total[7d])]
+- Peak Traffic Rate: [Peak Req/s] on [Date & Time]
+- Average Daily Requests: [Total / 7]
+- Uptime / Availability SLA: [Calculated Availability %] (Target: 99.9%)
+
+## 2. Infrastructure Health
+- Average Host CPU Utilization: [%]
+- Peak Host RAM Consumption: [%] (Max limit: 85%)
+- Storage Used: [GB] / [Total GB] ([%] free space)
+- MySQL Average Queries/sec: [queries/s]
+- Redis Memory Footprint: [MB]
+
+## 3. Incident & Error Log Summary
+- Total 5xx Server Errors: [Count]
+- Total 4xx Client Errors: [Count]
+- Failed Queue Jobs: [Count from php artisan queue:failed]
+- Top Failing Endpoints:
+  1. `POST /api/v1/...` (Reason: ...)
+  2. `GET /api/v1/...` (Reason: ...)
+
+## 4. Maintenance Actions Taken
+- Docker image pruning executed: [Yes/No]
+- Database backup verified: [Yes/No]
+- Disk storage headroom verified: [Yes/No]
+```

@@ -78,6 +78,7 @@
       "fieldConfig": {
         "defaults": {
           "unit": "short",
+          "noValue": "0",
           "color": { "mode": "palette-classic" },
           "thresholds": {
             "mode": "absolute",
@@ -106,6 +107,7 @@
       "fieldConfig": {
         "defaults": {
           "unit": "short",
+          "noValue": "0",
           "color": { "mode": "palette-classic" },
           "thresholds": {
             "mode": "absolute",
@@ -299,7 +301,7 @@
     ]
   },
   "time": { "from": "now-1h", "to": "now" },
-  "timezone": "browser",
+  "timezone": "Asia/Kathmandu",
   "title": "Tukaatu Express - Full Site Logs & Diagnostics",
   "uid": "delivery-logs",
   "version": 1
