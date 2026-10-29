@@ -195,7 +195,7 @@
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
-          "expr": "sum(rate(container_cpu_usage_seconds_total{name=~\"(/delivery.*|delivery.*)\"}[1m])) by (name) * 100",
+          "expr": "sum(rate(container_cpu_usage_seconds_total{name=~\".*delivery.*\"}[1m])) by (name) * 100",
           "legendFormat": "{{name}}",
           "refId": "A"
         }
@@ -216,7 +216,7 @@
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
-          "expr": "container_memory_working_set_bytes{name=~\"(/delivery.*|delivery.*)\"}",
+          "expr": "container_memory_working_set_bytes{name=~\".*delivery.*\"}",
           "legendFormat": "{{name}}",
           "refId": "A"
         }
@@ -399,5 +399,5 @@
   "timezone": "Asia/Kathmandu",
   "title": "Tukaatu Express - Full Site & Infrastructure Overview",
   "uid": "delivery-overview",
-  "version": 20
+  "version": 25
 }
