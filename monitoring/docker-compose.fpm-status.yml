@@ -1,0 +1,17 @@
+# Optional overlay for the APP stack. Does not replace docker-compose.yml.
+# From /var/www/delivery/delivery-deployment:
+#
+#   docker compose --env-file .env.production \
+#     -f docker-compose.yml -f monitoring/docker-compose.fpm-status.yml \
+#     up -d --no-deps backend-app
+#
+# Local:
+#   docker compose -f docker-compose.local.yml -f monitoring/docker-compose.fpm-status.yml \
+#     up -d --no-deps backend-app
+#
+# Restarts backend-app once so PHP-FPM loads pm.status_path. No ports are published.
+
+services:
+  backend-app:
+    volumes:
+      - ./monitoring/php-fpm/zz-status.conf:/usr/local/etc/php-fpm.d/zz-status.conf:ro

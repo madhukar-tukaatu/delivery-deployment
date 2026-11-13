@@ -1,6 +1,6 @@
 apiVersion: 1
 providers:
-  - name: Delivery local
+  - name: Delivery
     orgId: 1
     folder: Delivery
     type: file
@@ -9,3 +9,4 @@ providers:
     allowUiUpdates: false
     options:
       path: /var/lib/grafana/dashboards
+      foldersFromFilesStructure: false

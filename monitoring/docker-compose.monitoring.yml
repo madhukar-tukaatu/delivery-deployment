@@ -1,5 +1,12 @@
 name: delivery-monitoring
 
+# Local monitoring stack. Attach to the running delivery-local compose network.
+# From this directory:
+#   docker compose -f docker-compose.monitoring.yml up -d
+#
+# Optional PHP-FPM metrics (from the delivery-deployment repo root):
+#   docker compose -f docker-compose.local.yml -f monitoring/docker-compose.fpm-status.yml up -d --no-deps backend-app
+
 services:
   prometheus:
     image: prom/prometheus:v2.55.1
@@ -11,13 +18,33 @@ services:
       - --storage.tsdb.retention.time=15d
       - --web.enable-lifecycle
     ports:
-      - "9090:9090"
+      - "127.0.0.1:9090:9090"
     volumes:
-      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus/prometheus.local.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
       - prometheus_data:/prometheus
+    depends_on:
+      - alertmanager
+    mem_limit: 384m
     networks:
       - monitoring
       - delivery-local
+
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    container_name: delivery-local-alertmanager
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yml
+      - --storage.path=/alertmanager
+    ports:
+      - "127.0.0.1:9093:9093"
+    volumes:
+      - ./prometheus/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager_data:/alertmanager
+    mem_limit: 64m
+    networks:
+      - monitoring
 
   grafana:
     image: grafana/grafana:11.3.1
@@ -27,9 +54,11 @@ services:
       GF_SECURITY_ADMIN_USER: admin
       GF_SECURITY_ADMIN_PASSWORD: admin
       GF_USERS_ALLOW_SIGN_UP: "false"
-      GF_SERVER_ROOT_URL: http://localhost:3001
+      GF_SERVER_ROOT_URL: http://127.0.0.1:3001
+      TZ: Asia/Kathmandu
+      GF_DATE_FORMATS_DEFAULT_TIMEZONE: Asia/Kathmandu
     ports:
-      - "3001:3000"
+      - "127.0.0.1:3001:3000"
     volumes:
       - grafana_data:/var/lib/grafana
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
@@ -37,6 +66,7 @@ services:
     depends_on:
       - prometheus
       - loki
+    mem_limit: 256m
     networks:
       - monitoring
 
@@ -47,10 +77,11 @@ services:
     command:
       - -config.file=/etc/loki/local-config.yaml
     ports:
-      - "3100:3100"
+      - "127.0.0.1:3100:3100"
     volumes:
       - ./loki/loki-config.yml:/etc/loki/local-config.yaml:ro
       - loki_data:/loki
+    mem_limit: 256m
     networks:
       - monitoring
 
@@ -66,33 +97,43 @@ services:
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
     depends_on:
       - loki
+    mem_limit: 128m
     networks:
       - monitoring
 
   cadvisor:
-    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    image: ghcr.io/google/cadvisor:0.56.2
     container_name: delivery-local-cadvisor
     restart: unless-stopped
     privileged: true
+    command:
+      - --docker_only=true
+      - --housekeeping_interval=15s
+      - --store_container_labels=true
     ports:
-      - "8086:8080"
+      - "127.0.0.1:8086:8080"
     volumes:
       - /:/rootfs:ro
       - /var/run:/var/run:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - /sys:/sys:ro
       - /var/lib/docker/:/var/lib/docker:ro
+    mem_limit: 192m
     networks:
       - monitoring
 
   mysql-exporter:
-    image: prom/mysqld-exporter:v0.15.1
+    image: prom/mysqld-exporter:v0.17.2
     container_name: delivery-local-mysql-exporter
     restart: unless-stopped
     command:
-      - --config.my-cnf=/etc/mysql/my.cnf
-    volumes:
-      - ./prometheus/my.cnf:/etc/mysql/my.cnf:ro
+      - --mysqld.address=delivery-local-mysql:3306
+      - --mysqld.username=root
+      - --collect.global_status
+      - --collect.global_variables
+    environment:
+      MYSQLD_EXPORTER_PASSWORD: root_password
+    mem_limit: 96m
     networks:
       - monitoring
       - delivery-local
@@ -103,6 +144,8 @@ services:
     restart: unless-stopped
     environment:
       REDIS_ADDR: "redis://delivery-local-redis:6379"
+      REDIS_EXPORTER_CHECK_KEYS: "db0=*queues*"
+    mem_limit: 64m
     networks:
       - monitoring
       - delivery-local
@@ -112,7 +155,8 @@ services:
     container_name: delivery-local-nginx-exporter
     restart: unless-stopped
     command:
-      - -nginx.scrape-uri=http://delivery-local-backend-nginx:80/stub_status
+      - --nginx.scrape-uri=http://delivery-local-backend-nginx:80/stub_status
+    mem_limit: 48m
     networks:
       - monitoring
       - delivery-local
@@ -121,8 +165,46 @@ services:
     image: prom/node-exporter:v1.8.2
     container_name: delivery-local-node-exporter
     restart: unless-stopped
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - --path.procfs=/host/proc
+      - --path.sysfs=/host/sys
+      - --path.rootfs=/rootfs
+      - --no-collector.wifi
+      - --no-collector.hwmon
+      - --collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)
+    mem_limit: 48m
     networks:
       - monitoring
+
+  php-fpm-exporter:
+    image: hipages/php-fpm_exporter:2.2.0
+    container_name: delivery-local-php-fpm-exporter
+    restart: unless-stopped
+    environment:
+      PHP_FPM_SCRAPE_URI: "tcp://delivery-local-backend-app:9000/status"
+    mem_limit: 48m
+    networks:
+      - monitoring
+      - delivery-local
+
+  blackbox-exporter:
+    image: prom/blackbox-exporter:v0.25.0
+    container_name: delivery-local-blackbox-exporter
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/blackbox/blackbox.yml
+    ports:
+      - "127.0.0.1:9115:9115"
+    volumes:
+      - ./prometheus/blackbox.yml:/etc/blackbox/blackbox.yml:ro
+    mem_limit: 48m
+    networks:
+      - monitoring
+      - delivery-local
 
   k6:
     image: grafana/k6:0.54.0
@@ -147,3 +229,4 @@ volumes:
   prometheus_data:
   grafana_data:
   loki_data:
+  alertmanager_data:

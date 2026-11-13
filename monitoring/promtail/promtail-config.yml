@@ -12,7 +12,6 @@ clients:
     batchsize: 102400
 
 scrape_configs:
-  # 1. Scrape all Docker containers running Delivery Express services
   - job_name: delivery-docker-containers
     docker_sd_configs:
       - host: unix:///var/run/docker.sock
@@ -25,37 +24,45 @@ scrape_configs:
         target_label: 'service'
       - source_labels: ['__meta_docker_container_label_com_docker_compose_project']
         target_label: 'project'
-      # Keep containers matching delivery or express
       - source_labels: ['container']
         regex: '.*delivery.*'
         action: keep
     pipeline_stages:
-      # Docker log json format: {"log": "...", "stream": "stdout", "time": "..."}
       - json:
           expressions:
             output: log
             stream: stream
             log_time: time
 
-      # Multiline support for Laravel stack traces:
-      # Starts with [YYYY-MM-DD HH:MM:SS]
       - multiline:
           firstline: '^(\[\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}\]|^\d{4}/\d{2}/\d{2})'
           max_wait_time: 3s
           max_lines: 500
 
-      # Extract log level (ERROR, WARNING, INFO, DEBUG, CRITICAL)
       - regex:
           expression: '(?i)\b(?P<level>EMERGENCY|ALERT|CRITICAL|ERROR|WARNING|NOTICE|INFO|DEBUG)\b'
       - labels:
           level:
 
-      # For Nginx access logs: extract HTTP status and method if present
       - regex:
           expression: '\"(?P<http_method>GET|POST|PUT|DELETE|PATCH|OPTIONS|HEAD)\s+(?P<http_path>[^\s]+)\s+HTTP/[0-9.]+\"\s+(?P<http_status>\d{3})'
       - labels:
           http_status:
           http_method:
+
+      # Export Nginx status codes as a Prometheus counter (scraped from :9080).
+      - match:
+          selector: '{container=~".*nginx.*"}'
+          stages:
+            - metrics:
+                nginx_http_responses:
+                  type: Counter
+                  description: "Nginx HTTP responses by status"
+                  source: http_status
+                  prefix: promtail_custom_
+                  max_idle_duration: 24h
+                  config:
+                    action: inc
 
       - timestamp:
           source: log_time
@@ -63,4 +70,3 @@ scrape_configs:
 
       - output:
           source: output
-
