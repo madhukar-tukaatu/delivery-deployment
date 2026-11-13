@@ -39,7 +39,7 @@ services:
     volumes:
       - ./phpmyadmin/php-upload.ini:/usr/local/etc/php/conf.d/uploads.ini:ro
     ports:
-      - "8085:80"
+      - "127.0.0.1:8085:80"
     networks:
       - delivery
 

@@ -102,7 +102,38 @@ git -C delivery-deployment clean -fd -e .env.production
 log "Moving to deployment repo..."
 cd "$BASE_DIR/delivery-deployment"
 
+
+remove_stale_phpmyadmin() {
+  local expected="${COMPOSE_PROJECT_NAME:-$(basename "$PWD")}"
+  local project=""
+
+  if ! docker inspect delivery-phpmyadmin >/dev/null 2>&1; then
+    return 0
+  fi
+
+  project="$(docker inspect -f '{{index .Config.Labels "com.docker.compose.project"}}' delivery-phpmyadmin 2>/dev/null || true)"
+
+  if [ "$project" = "$expected" ]; then
+    log "delivery-phpmyadmin already belongs to compose project '$expected'; compose will recreate it if needed."
+    return 0
+  fi
+
+  log "Removing stale delivery-phpmyadmin (compose project='${project:-none}', expected='$expected') so the name and port 8085 can be reused."
+  docker rm -f delivery-phpmyadmin
+}
+
+log_port_8085() {
+  log "Who is using host port 8085:"
+  docker ps -a --format '{{.Names}} {{.Status}} {{.Ports}}' | grep -E '8085' || log "No Docker container lists port 8085."
+  if command -v ss >/dev/null 2>&1; then
+    ss -lptn 'sport = :8085' || true
+  fi
+}
+
 log "Building and starting Docker containers..."
+log_port_8085
+remove_stale_phpmyadmin
+
 docker compose --env-file "$COMPOSE_ENV" build --pull
 docker compose --env-file "$COMPOSE_ENV" up -d --remove-orphans
 
