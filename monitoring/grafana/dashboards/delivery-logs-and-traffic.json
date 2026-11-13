@@ -70,7 +70,7 @@
       "datasource": { "type": "loki", "uid": "loki" },
       "targets": [
         {
-          "expr": "sum(rate({container=~\"delivery.*nginx.*\"} |~ \" 50[0-9] \" [1m]))",
+          "expr": "sum(rate({container=~\"(/delivery-backend-nginx.*|delivery-backend-nginx.*)\"} !~ \"nginx-exporter\" |~ \" 50[0-9] \" [1m]))",
           "legendFormat": "5xx/sec",
           "refId": "A"
         }
@@ -99,7 +99,7 @@
       "datasource": { "type": "loki", "uid": "loki" },
       "targets": [
         {
-          "expr": "sum(rate({container=~\"delivery.*nginx.*\"} |~ \" 40[0-9] \" [1m]))",
+          "expr": "sum(rate({container=~\"(/delivery-backend-nginx.*|delivery-backend-nginx.*)\"} !~ \"nginx-exporter\" |~ \" 40[0-9] \" [1m]))",
           "legendFormat": "4xx/sec",
           "refId": "A"
         }
@@ -217,7 +217,7 @@
       "datasource": { "type": "loki", "uid": "loki" },
       "targets": [
         {
-          "expr": "{container=~\"delivery.*nginx.*\"} |~ \"$search\"",
+          "expr": "{container=~\"(/delivery-backend-nginx.*|delivery-backend-nginx.*)\"} !~ \"nginx-exporter\" |~ \"$search\"",
           "legendFormat": "",
           "refId": "A"
         }
@@ -304,6 +304,6 @@
   "timezone": "Asia/Kathmandu",
   "title": "Tukaatu Express - Full Site Logs & Diagnostics",
   "uid": "delivery-logs",
-  "version": 1
+  "version": 15
 }
 

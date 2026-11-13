@@ -1,0 +1,30 @@
+modules:
+  http_2xx:
+    prober: http
+    timeout: 8s
+    http:
+      valid_http_versions: ["HTTP/1.1", "HTTP/2.0"]
+      valid_status_codes: [200]
+      method: GET
+      follow_redirects: true
+      fail_if_not_ssl: true
+      tls_config:
+        insecure_skip_verify: false
+      preferred_ip_protocol: "ip4"
+      ip_protocol_fallback: false
+
+  http_2xx_plain:
+    prober: http
+    timeout: 8s
+    http:
+      valid_http_versions: ["HTTP/1.1", "HTTP/2.0"]
+      valid_status_codes: [200]
+      method: GET
+      follow_redirects: true
+      preferred_ip_protocol: "ip4"
+
+  tcp_connect:
+    prober: tcp
+    timeout: 5s
+    tcp:
+      preferred_ip_protocol: "ip4"

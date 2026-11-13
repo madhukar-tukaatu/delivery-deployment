@@ -1,2 +1,3 @@
 .env.monitoring
 prometheus/my.cnf.prod.local
+prometheus/my.cnf.local

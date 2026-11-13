@@ -1,6 +1,16 @@
 global:
   scrape_interval: 15s
   evaluation_interval: 15s
+  external_labels:
+    monitor: tukaatu-express
+
+rule_files:
+  - /etc/prometheus/alerts.yml
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ["alertmanager:9093"]
 
 scrape_configs:
   - job_name: prometheus
@@ -10,6 +20,11 @@ scrape_configs:
   - job_name: cadvisor
     static_configs:
       - targets: ["cadvisor:8080"]
+    metric_relabel_configs:
+      # Normalise leading slash on Docker container names (/delivery-backend-app)
+      - source_labels: [name]
+        regex: "/?(.*)"
+        target_label: name
 
   - job_name: mysql
     static_configs:
@@ -26,3 +41,62 @@ scrape_configs:
   - job_name: node
     static_configs:
       - targets: ["node-exporter:9100"]
+
+  - job_name: php-fpm
+    static_configs:
+      - targets: ["php-fpm-exporter:9253"]
+
+  - job_name: promtail
+    static_configs:
+      - targets: ["promtail:9080"]
+
+  - job_name: blackbox-http
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+    static_configs:
+      - targets:
+          - https://api.tukaatuexpress.com/api/v1/health
+          - https://tukaatuexpress.com
+        labels:
+          probe_kind: https
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115
+
+  - job_name: blackbox-http-plain
+    metrics_path: /probe
+    params:
+      module: [http_2xx_plain]
+    static_configs:
+      - targets: []
+        labels:
+          probe_kind: http
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115
+
+  - job_name: blackbox-ws
+    metrics_path: /probe
+    params:
+      module: [tcp_connect]
+    static_configs:
+      - targets:
+          - tukaatuexpress.com:443
+        labels:
+          probe_kind: ws-tcp
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115

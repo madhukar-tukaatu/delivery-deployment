@@ -1,3 +1,5 @@
+> **Updated operational runbook:** see [DEPLOY-VPS.md](DEPLOY-VPS.md) for the current deploy, tunnel, rollback and first-diagnosis commands. This longer guide still describes traffic flow and older alert ideas; prefer the provisioned alerts in prometheus/alerts.yml and the Grafana overview dashboard.
+
 # Tukaatu Express - Full System Application, Monitoring & Reporting Manual
 
 This manual provides the complete technical guide for operating the **Tukaatu Express** application stack, its internal connectivity with the monitoring tools (**Prometheus, Grafana, Loki, Promtail, and Exporters**), the full command reference for the application, and the incident diagnostics and reporting workflow.

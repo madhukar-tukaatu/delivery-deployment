@@ -7,6 +7,9 @@ datasources:
     uid: prometheus
     isDefault: true
     editable: true
+    jsonData:
+      timeInterval: 15s
+      httpMethod: POST
 
   - name: Loki
     type: loki
