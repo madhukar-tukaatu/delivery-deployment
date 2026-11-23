@@ -23,7 +23,11 @@ warn() {
 # 1. System packages & updates
 log "Updating system packages..."
 apt-get update -y
-apt-get install -y curl wget git ufw htop unzip fail2ban ca-certificates gnupg
+apt-get install -y curl wget git ufw htop unzip fail2ban ca-certificates gnupg tzdata
+
+# 1b. Configure Timezone to Asia/Kathmandu (Nepal Time UTC+5:45)
+log "Configuring system timezone to Asia/Kathmandu..."
+timedatectl set-timezone Asia/Kathmandu || ln -snf /usr/share/zoneinfo/Asia/Kathmandu /etc/localtime && echo "Asia/Kathmandu" > /etc/timezone
 
 # 2. Configure 4GB Swap (Essential to prevent out-of-memory during Next.js builds)
 if ! grep -q '/swapfile' /etc/fstab; then

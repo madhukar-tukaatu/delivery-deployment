@@ -196,6 +196,7 @@
       ],
       "options": {
         "showLabels": true,
+        "showTime": true,
         "wrapLogMessage": true,
         "enableLogDetails": true,
         "sortOrder": "Descending",
@@ -224,6 +225,7 @@
       ],
       "options": {
         "showLabels": true,
+        "showTime": true,
         "wrapLogMessage": true,
         "enableLogDetails": true,
         "sortOrder": "Descending"
@@ -251,6 +253,7 @@
       ],
       "options": {
         "showLabels": true,
+        "showTime": true,
         "wrapLogMessage": true,
         "enableLogDetails": true,
         "sortOrder": "Descending"
@@ -304,6 +307,6 @@
   "timezone": "Asia/Kathmandu",
   "title": "Tukaatu Express - Full Site Logs & Diagnostics",
   "uid": "delivery-logs",
-  "version": 15
+  "version": 16
 }
 
