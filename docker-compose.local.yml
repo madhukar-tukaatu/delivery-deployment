@@ -175,6 +175,8 @@ services:
     image: nginx:alpine
     container_name: delivery-local-backend-nginx
     restart: unless-stopped
+    environment:
+      TZ: Asia/Kathmandu
 
     ports:
       - "8081:80"
